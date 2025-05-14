@@ -3,12 +3,13 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/woutslakhorst/oas-ai-generator/assets"
 	_ "modernc.org/sqlite"
 )
 
@@ -32,7 +33,7 @@ func New() *sql.DB {
 }
 
 func applyMigrations(db *sql.DB) error {
-	entries, err := os.ReadDir("migrations")
+	entries, err := fs.ReadDir(assets.Migrations, "migrations")
 	if err != nil {
 		return err
 	}
@@ -41,8 +42,7 @@ func applyMigrations(db *sql.DB) error {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
 			continue
 		}
-		path := filepath.Join("migrations", e.Name())
-		data, err := os.ReadFile(path)
+		data, err := assets.Migrations.ReadFile("migrations/" + e.Name())
 		if err != nil {
 			return err
 		}

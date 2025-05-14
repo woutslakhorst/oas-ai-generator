@@ -22,4 +22,4 @@ The server listens on `:8080`.
 
 ## Migrations
 
-SQL migration scripts are located in the `migrations` directory. The server applies them automatically on startup.
+SQL migration scripts are embedded from the `assets/migrations` directory. The server applies them automatically on startup.

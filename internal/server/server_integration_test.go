@@ -27,7 +27,7 @@ func TestIntegration_PetOrderUser(t *testing.T) {
 	defer server.Close()
 
 	// create pet
-	petBody := loadJSON(t, "testdata/pet.json")
+	petBody := loadJSON(t, "../../testdata/pet.json")
 	resp, err := http.Post(server.URL+"/pet", "application/json", bytes.NewReader(petBody))
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +87,7 @@ func TestIntegration_PetOrderUser(t *testing.T) {
 	http.Get(server.URL + "/store/inventory")
 
 	// place order
-	orderBody := loadJSON(t, "testdata/order.json")
+	orderBody := loadJSON(t, "../../testdata/order.json")
 	resp, err = http.Post(server.URL+"/store/order", "application/json", bytes.NewReader(orderBody))
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +104,7 @@ func TestIntegration_PetOrderUser(t *testing.T) {
 	resp.Body.Close()
 
 	// create user
-	userBody := loadJSON(t, "testdata/user.json")
+	userBody := loadJSON(t, "../../testdata/user.json")
 	resp, err = http.Post(server.URL+"/user", "application/json", bytes.NewReader(userBody))
 	if err != nil {
 		t.Fatal(err)

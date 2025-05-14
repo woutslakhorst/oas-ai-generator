@@ -39,7 +39,7 @@ func TestServer_PetHandlers(t *testing.T) {
 	s := &Server{db: db}
 
 	// addPet
-	body := loadJSON(t, "testdata/pet.json")
+	body := loadJSON(t, "../../testdata/pet.json")
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/pet", bytes.NewReader(body))
@@ -108,7 +108,7 @@ func TestServer_PetHandlers(t *testing.T) {
 	}
 
 	// placeOrder
-	orderBody := loadJSON(t, "testdata/order.json")
+	orderBody := loadJSON(t, "../../testdata/order.json")
 	w = httptest.NewRecorder()
 	c, _ = gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/store/order", bytes.NewReader(orderBody))
@@ -141,7 +141,7 @@ func TestServer_PetHandlers(t *testing.T) {
 	}
 
 	// createUser
-	userBody := loadJSON(t, "testdata/user.json")
+	userBody := loadJSON(t, "../../testdata/user.json")
 	w = httptest.NewRecorder()
 	c, _ = gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/user", bytes.NewReader(userBody))
@@ -233,7 +233,7 @@ func TestServer_uploadFile(t *testing.T) {
 	s := &Server{db: db}
 
 	// first add pet to have ID
-	body := loadJSON(t, "testdata/pet.json")
+	body := loadJSON(t, "../../testdata/pet.json")
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/pet", bytes.NewReader(body))
