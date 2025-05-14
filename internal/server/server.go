@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,7 +52,13 @@ func (s *Server) addPet(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	res, err := s.db.Exec(`INSERT INTO pets (name, status) VALUES (?, ?)`, p.Name, p.Status)
+	stmt, err := s.db.Prepare(`INSERT INTO pets (name, status) VALUES (?, ?)`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	res, err := stmt.Exec(p.Name, p.Status)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -67,7 +74,13 @@ func (s *Server) updatePet(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if _, err := s.db.Exec(`UPDATE pets SET name=?, status=? WHERE id=?`, p.Name, p.Status, p.ID); err != nil {
+	stmt, err := s.db.Prepare(`UPDATE pets SET name=?, status=? WHERE id=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(p.Name, p.Status, p.ID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -81,7 +94,13 @@ func (s *Server) getPetByID(c *gin.Context) {
 		return
 	}
 	var p models.Pet
-	row := s.db.QueryRow(`SELECT id, name, status FROM pets WHERE id=?`, id)
+	stmt, err := s.db.Prepare(`SELECT id, name, status FROM pets WHERE id=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	row := stmt.QueryRow(id)
 	if err := row.Scan(&p.ID, &p.Name, &p.Status); err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -99,7 +118,13 @@ func (s *Server) deletePet(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	if _, err := s.db.Exec(`DELETE FROM pets WHERE id=?`, id); err != nil {
+	stmt, err := s.db.Prepare(`DELETE FROM pets WHERE id=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -114,7 +139,14 @@ func (s *Server) findPetsByStatus(c *gin.Context) {
 	for i, v := range statuses {
 		args[i] = strings.TrimSpace(v)
 	}
-	rows, err := s.db.Query(`SELECT id, name, status FROM pets WHERE status IN (`+placeholders+`)`, args...)
+	query := fmt.Sprintf(`SELECT id, name, status FROM pets WHERE status IN (%s)`, placeholders)
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -142,8 +174,14 @@ func (s *Server) findPetsByTags(c *gin.Context) {
 	for i, v := range tags {
 		args[i] = strings.TrimSpace(v)
 	}
-	query := `SELECT DISTINCT p.id, p.name, p.status FROM pets p JOIN pet_tags pt ON p.id=pt.pet_id JOIN tags t ON pt.tag_id=t.id WHERE t.name IN (` + placeholders + `)`
-	rows, err := s.db.Query(query, args...)
+	query := fmt.Sprintf(`SELECT DISTINCT p.id, p.name, p.status FROM pets p JOIN pet_tags pt ON p.id=pt.pet_id JOIN tags t ON pt.tag_id=t.id WHERE t.name IN (%s)`, placeholders)
+	stmt, err := s.db.Prepare(query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query(args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -168,13 +206,25 @@ func (s *Server) updatePetWithForm(c *gin.Context) {
 	name := c.Query("name")
 	status := c.Query("status")
 	if name != "" {
-		if _, err := s.db.Exec(`UPDATE pets SET name=? WHERE id=?`, name, id); err != nil {
+		stmt, err := s.db.Prepare(`UPDATE pets SET name=? WHERE id=?`)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		defer stmt.Close()
+		if _, err := stmt.Exec(name, id); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 	}
 	if status != "" {
-		if _, err := s.db.Exec(`UPDATE pets SET status=? WHERE id=?`, status, id); err != nil {
+		stmt, err := s.db.Prepare(`UPDATE pets SET status=? WHERE id=?`)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		defer stmt.Close()
+		if _, err := stmt.Exec(status, id); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -192,7 +242,13 @@ func (s *Server) uploadFile(c *gin.Context) {
 }
 
 func (s *Server) getInventory(c *gin.Context) {
-	rows, err := s.db.Query(`SELECT status, COUNT(*) FROM pets GROUP BY status`)
+	stmt, err := s.db.Prepare(`SELECT status, COUNT(*) FROM pets GROUP BY status`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	rows, err := stmt.Query()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -215,7 +271,13 @@ func (s *Server) placeOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	res, err := s.db.Exec(`INSERT INTO orders (pet_id, quantity, ship_date, status, complete) VALUES (?,?,?,?,?)`, o.PetID, o.Quantity, o.ShipDate.Format(time.RFC3339), o.Status, o.Complete)
+	stmt, err := s.db.Prepare(`INSERT INTO orders (pet_id, quantity, ship_date, status, complete) VALUES (?,?,?,?,?)`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	res, err := stmt.Exec(o.PetID, o.Quantity, o.ShipDate.Format(time.RFC3339), o.Status, o.Complete)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -232,7 +294,13 @@ func (s *Server) getOrderByID(c *gin.Context) {
 		return
 	}
 	var o models.Order
-	row := s.db.QueryRow(`SELECT id, pet_id, quantity, ship_date, status, complete FROM orders WHERE id=?`, id)
+	stmt, err := s.db.Prepare(`SELECT id, pet_id, quantity, ship_date, status, complete FROM orders WHERE id=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	row := stmt.QueryRow(id)
 	var ship string
 	if err := row.Scan(&o.ID, &o.PetID, &o.Quantity, &ship, &o.Status, &o.Complete); err != nil {
 		if err == sql.ErrNoRows {
@@ -254,7 +322,13 @@ func (s *Server) deleteOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	if _, err := s.db.Exec(`DELETE FROM orders WHERE id=?`, id); err != nil {
+	stmt, err := s.db.Prepare(`DELETE FROM orders WHERE id=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -267,8 +341,13 @@ func (s *Server) createUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	res, err := s.db.Exec(`INSERT INTO users (username, first_name, last_name, email, password, phone, user_status) VALUES (?,?,?,?,?,?,?)`,
-		u.Username, u.FirstName, u.LastName, u.Email, u.Password, u.Phone, u.UserStatus)
+	stmt, err := s.db.Prepare(`INSERT INTO users (username, first_name, last_name, email, password, phone, user_status) VALUES (?,?,?,?,?,?,?)`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	res, err := stmt.Exec(u.Username, u.FirstName, u.LastName, u.Email, u.Password, u.Phone, u.UserStatus)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -289,9 +368,15 @@ func (s *Server) createUsersWithListInput(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	stmt, err := tx.Prepare(`INSERT INTO users (username, first_name, last_name, email, password, phone, user_status) VALUES (?,?,?,?,?,?,?)`)
+	if err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
 	for i, u := range users {
-		res, err := tx.Exec(`INSERT INTO users (username, first_name, last_name, email, password, phone, user_status) VALUES (?,?,?,?,?,?,?)`,
-			u.Username, u.FirstName, u.LastName, u.Email, u.Password, u.Phone, u.UserStatus)
+		res, err := stmt.Exec(u.Username, u.FirstName, u.LastName, u.Email, u.Password, u.Phone, u.UserStatus)
 		if err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -308,7 +393,13 @@ func (s *Server) loginUser(c *gin.Context) {
 	username := c.Query("username")
 	password := c.Query("password")
 	var id int64
-	err := s.db.QueryRow(`SELECT id FROM users WHERE username=? AND password=?`, username, password).Scan(&id)
+	stmt, err := s.db.Prepare(`SELECT id FROM users WHERE username=? AND password=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	err = stmt.QueryRow(username, password).Scan(&id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid username/password"})
 		return
@@ -323,7 +414,13 @@ func (s *Server) logoutUser(c *gin.Context) {
 func (s *Server) getUserByName(c *gin.Context) {
 	username := c.Param("username")
 	var u models.User
-	row := s.db.QueryRow(`SELECT id, username, first_name, last_name, email, password, phone, user_status FROM users WHERE username=?`, username)
+	stmt, err := s.db.Prepare(`SELECT id, username, first_name, last_name, email, password, phone, user_status FROM users WHERE username=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	row := stmt.QueryRow(username)
 	if err := row.Scan(&u.ID, &u.Username, &u.FirstName, &u.LastName, &u.Email, &u.Password, &u.Phone, &u.UserStatus); err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -342,8 +439,13 @@ func (s *Server) updateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if _, err := s.db.Exec(`UPDATE users SET username=?, first_name=?, last_name=?, email=?, password=?, phone=?, user_status=? WHERE username=?`,
-		u.Username, u.FirstName, u.LastName, u.Email, u.Password, u.Phone, u.UserStatus, username); err != nil {
+	stmt, err := s.db.Prepare(`UPDATE users SET username=?, first_name=?, last_name=?, email=?, password=?, phone=?, user_status=? WHERE username=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(u.Username, u.FirstName, u.LastName, u.Email, u.Password, u.Phone, u.UserStatus, username); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -352,7 +454,13 @@ func (s *Server) updateUser(c *gin.Context) {
 
 func (s *Server) deleteUser(c *gin.Context) {
 	username := c.Param("username")
-	if _, err := s.db.Exec(`DELETE FROM users WHERE username=?`, username); err != nil {
+	stmt, err := s.db.Prepare(`DELETE FROM users WHERE username=?`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer stmt.Close()
+	if _, err := stmt.Exec(username); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
