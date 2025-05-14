@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/example/petstore/internal/db"
-	"github.com/example/petstore/internal/server"
+	"github.com/woutslakhorst/oas-ai-generator/internal/db"
+	"github.com/woutslakhorst/oas-ai-generator/internal/server"
 )
 
 func main() {

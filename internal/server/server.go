@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/example/petstore/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/woutslakhorst/oas-ai-generator/internal/models"
 )
 
 type Server struct {

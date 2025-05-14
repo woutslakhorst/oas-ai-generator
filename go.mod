@@ -1,4 +1,4 @@
-module github.com/example/petstore
+module github.com/woutslakhorst/oas-ai-generator
 
 go 1.20
 

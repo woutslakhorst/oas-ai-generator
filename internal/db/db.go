@@ -2,8 +2,12 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -21,5 +25,30 @@ func New() *sql.DB {
 	if _, err := db.Exec(`PRAGMA foreign_keys = ON`); err != nil {
 		log.Fatalf("unable to enable foreign keys: %v", err)
 	}
+	if err := applyMigrations(db); err != nil {
+		log.Fatalf("unable to apply migrations: %v", err)
+	}
 	return db
+}
+
+func applyMigrations(db *sql.DB) error {
+	entries, err := os.ReadDir("migrations")
+	if err != nil {
+		return err
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
+		}
+		path := filepath.Join("migrations", e.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if _, err := db.Exec(string(data)); err != nil {
+			return fmt.Errorf("%s: %w", e.Name(), err)
+		}
+	}
+	return nil
 }
