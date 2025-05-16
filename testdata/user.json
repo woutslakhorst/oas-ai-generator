@@ -1,9 +1,0 @@
-{
-  "username": "johndoe",
-  "firstName": "John",
-  "lastName": "Doe",
-  "email": "john@example.com",
-  "password": "secret",
-  "phone": "123456",
-  "userStatus": 1
-}
